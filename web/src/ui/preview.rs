@@ -2,6 +2,7 @@ use std::str::FromStr;
 use base64::Engine;
 use roxmltree::Document;
 use svgtypes::Length;
+use wasm_bindgen::JsCast;
 use yew::prelude::*;
 use yewdux::functional::use_store_value;
 use crate::state::AppState;
@@ -12,6 +13,8 @@ pub struct PreviewProps {
     pub scale: f64,
     pub filename: String,
     pub dimensions: [Option<Length>; 2],
+    pub offset: [f64; 2],
+    pub on_offset_change: Callback<[f64; 2]>,
 }
 
 // Parse SVG size from viewBox or width/height attributes
@@ -113,6 +116,9 @@ pub fn svg_preview(props: &PreviewProps) -> Html {
     let bed_width = app_state.settings.conversion.bed_size[0];
     let bed_height = app_state.settings.conversion.bed_size[1];
 
+    let is_dragging = use_state(|| false);
+    let drag_start = use_state(|| None::<(f64, f64)>);
+
     // Parse SVG dimensions in mm
     let svg_dimensions = parse_svg_dimensions(&props.svg_content, props.dimensions);
 
@@ -140,12 +146,75 @@ pub fn svg_preview(props: &PreviewProps) -> Html {
     let fits_on_bed = scaled_width <= bed_width && scaled_height <= bed_height;
     let warning_color = if fits_on_bed { "#4caf50" } else { "#f44336" };
 
+    let onmousedown = {
+        let is_dragging = is_dragging.clone();
+        let drag_start = drag_start.clone();
+        let offset = props.offset;
+        Callback::from(move |e: MouseEvent| {
+            e.prevent_default();
+            if let Some(target) = e.current_target() {
+                let element: web_sys::Element = target.dyn_into().unwrap();
+                let rect = element.get_bounding_client_rect();
+
+                // Convert mouse position to SVG coordinates
+                let x = ((e.client_x() as f64 - rect.left()) / rect.width()) * bed_width;
+                let y = ((e.client_y() as f64 - rect.top()) / rect.height()) * bed_height;
+
+                drag_start.set(Some((x - offset[0], y - offset[1])));
+                is_dragging.set(true);
+            }
+        })
+    };
+
+    let onmousemove = {
+        let is_dragging = is_dragging.clone();
+        let drag_start = drag_start.clone();
+        let on_offset_change = props.on_offset_change.clone();
+        Callback::from(move |e: MouseEvent| {
+            if *is_dragging {
+                e.prevent_default();
+                if let Some((start_x, start_y)) = *drag_start {
+                    if let Some(target) = e.current_target() {
+                        let element: web_sys::Element = target.dyn_into().unwrap();
+                        let rect = element.get_bounding_client_rect();
+
+                        let x = ((e.client_x() as f64 - rect.left()) / rect.width()) * bed_width;
+                        let y = ((e.client_y() as f64 - rect.top()) / rect.height()) * bed_height;
+
+                        let new_offset_x = (x - start_x).max(0.0).min(bed_width - scaled_width);
+                        let new_offset_y = (y - start_y).max(0.0).min(bed_height - scaled_height);
+
+                        on_offset_change.emit([new_offset_x, new_offset_y]);
+                    }
+                }
+            }
+        })
+    };
+
+    let onmouseup = {
+        let is_dragging = is_dragging.clone();
+        Callback::from(move |_: MouseEvent| {
+            is_dragging.set(false);
+        })
+    };
+
+    let onmouseleave = {
+        let is_dragging = is_dragging.clone();
+        Callback::from(move |_: MouseEvent| {
+            is_dragging.set(false);
+        })
+    };
+
     html! {
         <div class="svg-preview-container" style="position: relative; width: 100%; aspect-ratio: 1;">
             <svg
                 xmlns="http://www.w3.org/2000/svg"
                 viewBox={view_box.clone()}
-                style="width: 100%; height: 100%; border: 1px solid #ccc; background: white;"
+                style={format!("width: 100%; height: 100%; border: 1px solid #ccc; background: white; cursor: {};", if *is_dragging { "grabbing" } else { "grab" })}
+                onmousedown={onmousedown}
+                onmousemove={onmousemove}
+                onmouseup={onmouseup}
+                onmouseleave={onmouseleave}
             >
                 // Grid lines
                 <g class="grid" stroke="#e0e0e0" stroke-width="0.5">
@@ -192,8 +261,8 @@ pub fn svg_preview(props: &PreviewProps) -> Html {
                 if svg_dimensions.is_some() {
                     <image
                         href={format!("data:image/svg+xml;base64,{}", svg_base64)}
-                        x="0"
-                        y="0"
+                        x={props.offset[0].to_string()}
+                        y={props.offset[1].to_string()}
                         width={scaled_width.to_string()}
                         height={scaled_height.to_string()}
                         preserveAspectRatio="xMinYMin meet"
@@ -201,8 +270,8 @@ pub fn svg_preview(props: &PreviewProps) -> Html {
 
                     // Draw outline box around SVG area
                     <rect
-                        x="0"
-                        y="0"
+                        x={props.offset[0].to_string()}
+                        y={props.offset[1].to_string()}
                         width={scaled_width.to_string()}
                         height={scaled_height.to_string()}
                         fill="none"
@@ -216,6 +285,7 @@ pub fn svg_preview(props: &PreviewProps) -> Html {
                 <div>{format!("Bed: {}×{} mm", bed_width, bed_height)}</div>
                 <div><strong>{format!("SVG: {}", dimensions_info)}</strong></div>
                 <div>{format!("Scale: {:.2}x", props.scale)}</div>
+                <div>{format!("Offset: X={:.1} Y={:.1} mm", props.offset[0], props.offset[1])}</div>
                 if !fits_on_bed && svg_dimensions.is_some() {
                     <div style="color: #f44336;"><strong>{"⚠ Too large for bed!"}</strong></div>
                 }

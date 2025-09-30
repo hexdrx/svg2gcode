@@ -426,6 +426,7 @@ pub fn svg_form() -> Html {
                                         filename,
                                         dimensions: [None; 2],
                                         scale: 1.0,
+                                        offset: [0.0, 0.0],
                                     })
                                 }
                             }),
@@ -517,6 +518,7 @@ pub fn svg_form() -> Html {
                                     filename: response_url,
                                     dimensions: [None; 2],
                                     scale: 1.0,
+                                    offset: [0.0, 0.0],
                                 });
                             });
                         };

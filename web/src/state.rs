@@ -139,6 +139,7 @@ pub struct Svg {
     pub filename: String,
     pub dimensions: [Option<Length>; 2],
     pub scale: f64,
+    pub offset: [f64; 2],
 }
 
 impl Default for AppState {

@@ -70,6 +70,12 @@ fn app() -> Html {
                 let mut scaled_conversion_config = app_store.settings.conversion.clone();
                 scaled_conversion_config.dpi = scaled_conversion_config.dpi / svg.scale;
 
+                // Apply offset
+                scaled_conversion_config.origin = [
+                    Some(svg.offset[0]),
+                    Some(svg.offset[1]),
+                ];
+
                 let machine = Machine::new(
                     app_store.settings.machine.supported_functionality.clone(),
                     app_store
@@ -222,6 +228,7 @@ fn app() -> Html {
                             let svg_scale = svg.scale;
                             let svg_filename = svg.filename.clone();
                             let svg_dimensions = svg.dimensions;
+                            let svg_offset = svg.offset;
 
                             let remove_svg_onclick = app_dispatch.reduce_mut_callback(move |app| {
                                 app.svgs.remove(i);
@@ -236,6 +243,10 @@ fn app() -> Html {
                                 }
                             });
 
+                            let on_offset_change = app_dispatch.reduce_mut_callback_with(move |app, offset: [f64; 2]| {
+                                app.svgs[i].offset = offset;
+                            });
+
                             let body = html!{
                                 <div>
                                     <SvgPreview
@@ -243,6 +254,8 @@ fn app() -> Html {
                                         scale={svg_scale}
                                         filename={svg_filename.clone()}
                                         dimensions={svg_dimensions}
+                                        offset={svg_offset}
+                                        on_offset_change={on_offset_change}
                                     />
                                     <div class="form-group" style="margin-top: 10px;">
                                         <label class="form-label">{"Scale:"}</label>
