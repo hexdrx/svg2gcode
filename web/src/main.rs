@@ -3,7 +3,6 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use base64::Engine;
 use g_code::{
     emit::{format_gcode_fmt, format_gcode_io, FormatOptions},
     parse::snippet_parser,
@@ -67,6 +66,10 @@ fn app() -> Html {
                     dimensions: svg.dimensions,
                 };
 
+                // Apply scale by adjusting DPI (higher DPI = smaller output, so divide by scale)
+                let mut scaled_conversion_config = app_store.settings.conversion.clone();
+                scaled_conversion_config.dpi = scaled_conversion_config.dpi / svg.scale;
+
                 let machine = Machine::new(
                     app_store.settings.machine.supported_functionality.clone(),
                     app_store
@@ -112,7 +115,7 @@ fn app() -> Html {
                 .unwrap();
 
                 let program =
-                    svg2program(&document, &app_store.settings.conversion, options, machine);
+                    svg2program(&document, &scaled_conversion_config, options, machine);
 
                 let filepath = if app_store.svgs.len() > 1 {
                     PathBuf::from("svg2gcode_output")
@@ -215,10 +218,47 @@ fn app() -> Html {
                 <div class={classes!("card-container", "columns")}>
                     {
                         for app_store.svgs.iter().enumerate().map(|(i, svg)| {
-                            let svg_base64 = base64::engine::general_purpose::STANDARD_NO_PAD.encode(svg.content.as_bytes());
+                            let svg_content = svg.content.clone();
+                            let svg_scale = svg.scale;
+                            let svg_filename = svg.filename.clone();
+                            let svg_dimensions = svg.dimensions;
+
                             let remove_svg_onclick = app_dispatch.reduce_mut_callback(move |app| {
                                 app.svgs.remove(i);
                             });
+
+                            let scale_oninput = app_dispatch.reduce_mut_callback_with(move |app, event: InputEvent| {
+                                let value = event.target_unchecked_into::<web_sys::HtmlInputElement>().value();
+                                if let Ok(scale) = value.parse::<f64>() {
+                                    if scale > 0.0 {
+                                        app.svgs[i].scale = scale;
+                                    }
+                                }
+                            });
+
+                            let body = html!{
+                                <div>
+                                    <SvgPreview
+                                        svg_content={svg_content.clone()}
+                                        scale={svg_scale}
+                                        filename={svg_filename.clone()}
+                                        dimensions={svg_dimensions}
+                                    />
+                                    <div class="form-group" style="margin-top: 10px;">
+                                        <label class="form-label">{"Scale:"}</label>
+                                        <input
+                                            type="number"
+                                            class="form-input"
+                                            step="0.1"
+                                            min="0.1"
+                                            value={svg_scale.to_string()}
+                                            oninput={scale_oninput}
+                                            style="width: 100%;"
+                                        />
+                                    </div>
+                                </div>
+                            };
+
                             let footer = html!{
                                 <Button
                                     title="Remove"
@@ -235,9 +275,7 @@ fn app() -> Html {
                                 <div class={classes!("column", "col-6", "col-xs-12")}>
                                     <Card
                                         title={svg.filename.clone()}
-                                        img={html_nested!(
-                                            <img class="img-responsive" src={format!("data:image/svg+xml;base64,{}", svg_base64)} alt={svg.filename.clone()} />
-                                        )}
+                                        body={body}
                                         footer={footer}
                                     />
                                 </div>

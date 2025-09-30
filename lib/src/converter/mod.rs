@@ -34,10 +34,17 @@ pub struct ConversionConfig {
     pub origin: [Option<f64>; 2],
     /// Set extra attribute to add when printing node name
     pub extra_attribute_name: Option<String>,
+    /// Plotter bed size in millimeters (width, height)
+    #[cfg_attr(feature = "serde", serde(default = "default_bed_size"))]
+    pub bed_size: [f64; 2],
 }
 
 const fn zero_origin() -> [Option<f64>; 2] {
     [Some(0.); 2]
+}
+
+const fn default_bed_size() -> [f64; 2] {
+    [300.0, 300.0]
 }
 
 impl Default for ConversionConfig {
@@ -48,6 +55,7 @@ impl Default for ConversionConfig {
             dpi: 96.0,
             origin: zero_origin(),
 	    extra_attribute_name : None,
+            bed_size: default_bed_size(),
         }
     }
 }

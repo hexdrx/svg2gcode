@@ -22,12 +22,42 @@ pub struct FormState {
     pub checksums: bool,
     pub line_numbers: bool,
     pub newline_before_comment: bool,
+    pub bed_size: [Result<f64, ParseFloatError>; 2],
 }
 
 impl Default for FormState {
     fn default() -> Self {
         let app_state = AppState::default();
         Self::from(&app_state.settings)
+    }
+}
+
+impl From<&Settings> for FormState {
+    fn from(settings: &Settings) -> Self {
+        Self {
+            tolerance: Ok(settings.conversion.tolerance),
+            feedrate: Ok(settings.conversion.feedrate),
+            circular_interpolation: settings
+                .machine
+                .supported_functionality
+                .circular_interpolation,
+            origin: [
+                settings.conversion.origin[0].map(Ok),
+                settings.conversion.origin[1].map(Ok),
+            ],
+            dpi: Ok(settings.conversion.dpi),
+            tool_on_sequence: settings.machine.tool_on_sequence.clone().map(Ok),
+            tool_off_sequence: settings.machine.tool_off_sequence.clone().map(Ok),
+            begin_sequence: settings.machine.begin_sequence.clone().map(Ok),
+            end_sequence: settings.machine.end_sequence.clone().map(Ok),
+            checksums: settings.postprocess.checksums,
+            line_numbers: settings.postprocess.line_numbers,
+            newline_before_comment: settings.postprocess.newline_before_comment,
+            bed_size: [
+                Ok(settings.conversion.bed_size[0]),
+                Ok(settings.conversion.bed_size[1]),
+            ],
+        }
     }
 }
 
@@ -53,6 +83,10 @@ impl<'a> TryInto<Settings> for &'a FormState {
                     self.origin[1].clone().transpose()?,
                 ],
 		extra_attribute_name: None,
+                bed_size: [
+                    self.bed_size[0].clone()?,
+                    self.bed_size[1].clone()?,
+                ],
             },
             machine: MachineConfig {
                 supported_functionality: SupportedFunctionality {
@@ -89,30 +123,6 @@ impl<'a> TryInto<Settings> for &'a FormState {
     }
 }
 
-impl From<&Settings> for FormState {
-    fn from(settings: &Settings) -> Self {
-        Self {
-            tolerance: Ok(settings.conversion.tolerance),
-            feedrate: Ok(settings.conversion.feedrate),
-            circular_interpolation: settings
-                .machine
-                .supported_functionality
-                .circular_interpolation,
-            origin: [
-                settings.conversion.origin[0].map(Ok),
-                settings.conversion.origin[1].map(Ok),
-            ],
-            dpi: Ok(settings.conversion.dpi),
-            tool_on_sequence: settings.machine.tool_on_sequence.clone().map(Ok),
-            tool_off_sequence: settings.machine.tool_off_sequence.clone().map(Ok),
-            begin_sequence: settings.machine.begin_sequence.clone().map(Ok),
-            end_sequence: settings.machine.end_sequence.clone().map(Ok),
-            checksums: settings.postprocess.checksums,
-            line_numbers: settings.postprocess.line_numbers,
-            newline_before_comment: settings.postprocess.newline_before_comment,
-        }
-    }
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Store)]
 #[store(storage = "local", storage_tab_sync)]
@@ -128,6 +138,7 @@ pub struct Svg {
     pub content: String,
     pub filename: String,
     pub dimensions: [Option<Length>; 2],
+    pub scale: f64,
 }
 
 impl Default for AppState {

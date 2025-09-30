@@ -1,0 +1,10 @@
+version: '3.8'
+
+services:
+  svg2gcode-web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:80"
+    restart: unless-stopped

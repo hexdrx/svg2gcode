@@ -131,6 +131,12 @@ pub fn settings_form() -> Html {
                     <div class="column col-6 col-sm-12">
                         <OriginYInput/>
                     </div>
+                    <div class="column col-6 col-sm-12">
+                        <BedWidthInput/>
+                    </div>
+                    <div class="column col-6 col-sm-12">
+                        <BedHeightInput/>
+                    </div>
                     <div class="column col-12">
                         <FormGroup>
                             <Checkbox
@@ -419,6 +425,7 @@ pub fn svg_form() -> Html {
                                         content: text,
                                         filename,
                                         dimensions: [None; 2],
+                                        scale: 1.0,
                                     })
                                 }
                             }),
@@ -509,6 +516,7 @@ pub fn svg_form() -> Html {
                                     content: text,
                                     filename: response_url,
                                     dimensions: [None; 2],
+                                    scale: 1.0,
                                 });
                             });
                         };
